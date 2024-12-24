@@ -83,7 +83,10 @@ def test(lib, handle, torch_device, voc, random_val, topp, topk, temperature, x_
     )
     data = torch.arange(voc).float() * 0.0001
     _perm = torch.randperm(voc)
-    data = data[_perm].to(x_dtype).to(torch_device)
+    if (torch_device == 'maca'):
+        data = data[_perm].to(x_dtype).to('cuda')
+    else:
+        data = data[_perm].to(x_dtype).to(torch_device)
     if(topp > 0 and topk > 1):
         ans = random_sample(data.to("cpu"), random_val, topp, topk, voc, temperature, "cpu")
     else:
@@ -91,12 +94,14 @@ def test(lib, handle, torch_device, voc, random_val, topp, topk, temperature, x_
     if(torch_device == 'mlu' or torch_device == 'npu'):
         
         indices = torch.zeros([1], dtype = torch.int64).to(torch_device)
+    elif(torch_device == 'maca'):
+        indices = torch.zeros([1], dtype = torch.int64).to('cuda')
     else:
         
         indices = torch.zeros([1], dtype = torch.uint64).to(torch_device)
     x_tensor = to_tensor(data, lib)
     indices_tensor = to_tensor(indices, lib)
-    if(torch_device == 'mlu' or torch_device == 'npu'):
+    if(torch_device == 'mlu' or torch_device == 'npu' or torch_device == 'maca'):
         indices_tensor.descriptor.contents.dt = U64 # treat int64 as uint64
     
     
@@ -167,6 +172,13 @@ def test_ascend(lib, test_cases):
     for (voc, random_val, topp, topk, temperature) in test_cases:
         test(lib, handle, "npu", voc, random_val, topp, topk, temperature)
     destroy_handle(lib, handle) 
+
+def test_maca(lib, test_cases):
+    device = DeviceEnum.DEVICE_MACA
+    handle = create_handle(lib, device)
+    for (voc, random_val, topp, topk, temperature) in test_cases:
+        test(lib, handle, "maca", voc, random_val, topp, topk, temperature)
+    destroy_handle(lib, handle) 
     
 
 
@@ -224,6 +236,8 @@ if __name__ == "__main__":
         test_bang(lib, test_cases)
     if args.ascend:
         test_ascend(lib, test_cases)
-    if not (args.cpu or args.cuda or args.bang or args.ascend):
+    if args.maca:
+        test_maca(lib, test_cases)
+    if not (args.cpu or args.cuda or args.bang or args.ascend or args.maca):
         test_cpu(lib, test_cases)
     print("\033[92mTest passed!\033[0m")
