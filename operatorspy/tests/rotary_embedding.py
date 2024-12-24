@@ -79,6 +79,11 @@ def test(lib, handle, torch_device, shape, strides=None, dtype=torch.float16):
         pos = pos.to(torch.int64)
         pos = pos.to(torch_device)
         t = t.to(torch_device)
+    elif torch_device == 'maca':
+        ans = rotary_embedding(t, pos, theta, "cpu").to('cuda')
+        pos = pos.to(torch.int64)
+        pos = pos.to('cuda')
+        t = t.to('cuda')
     else:
         t = t.to(torch_device)
         pos = pos.to(torch_device)
@@ -90,7 +95,7 @@ def test(lib, handle, torch_device, shape, strides=None, dtype=torch.float16):
     sin_table, cos_table = sin_cos_table(t.shape[0] * 2, t.shape[2], t.device, theta)
     t_tensor = to_tensor(t, lib)
     pos_tensor = to_tensor(pos, lib)
-    if(torch_device == 'mlu'):
+    if(torch_device == 'mlu' or torch_device == 'maca'):
         pos_tensor.descriptor.contents.dt = U64
     sin_table_tensor = to_tensor(sin_table, lib)
     cos_table_tensor = to_tensor(cos_table, lib)
@@ -165,6 +170,13 @@ def test_ascend(lib, test_cases) :
         test(lib, handle, "npu", shape, strides, dtype)
     destroy_handle(lib, handle)
 
+def test_maca(lib, test_cases) :
+    device = DeviceEnum.DEVICE_MACA
+    handle = create_handle(lib, device)
+    for shape, strides, dtype in test_cases:
+        test(lib, handle, "maca", shape, strides, dtype)
+    destroy_handle(lib, handle)
+
 if __name__ == "__main__":
     test_cases = [
         ((1, 32, 128), None, torch.float16),
@@ -215,5 +227,7 @@ if __name__ == "__main__":
         test_bang(lib, test_cases)
     if args.ascend:
         test_ascend(lib, test_cases)
-    if not (args.cpu or args.cuda or args.bang or args.ascend):
+    if args.maca:
+        test_maca(lib, test_cases)
+    if not (args.cpu or args.cuda or args.bang or args.ascend or args.maca):
         test_cpu(lib, test_cases)
