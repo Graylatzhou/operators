@@ -17,7 +17,7 @@ __C __export infiniopStatus_t infiniopCreateGatherDescriptor(infiniopHandle_t ha
                                                                 int64_t axis
                                                                 );
 
-__C __export infiniopStatus_t infiniopGather(infiniopGatherDescriptor_t desc, void const *x, void *indices, void *y, void *stream);
+__C __export infiniopStatus_t infiniopGather(infiniopGatherDescriptor_t desc, void *x, void *indices, void *y, void *stream);
 
 __C __export infiniopStatus_t infiniopDestroyGatherDescriptor(infiniopGatherDescriptor_t desc);
 

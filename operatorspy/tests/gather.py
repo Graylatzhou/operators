@@ -107,7 +107,7 @@ def test(
         elapsed = (time.time() - start_time) / NUM_ITERATIONS
         print(f"lib time: {elapsed :10f}")
     print(f"pytorch ans: {ans}")
-    print(f"lib ans: {dst_tensor.data}")
+    print(f"lib ans: {dst}")
     assert torch.allclose(dst, ans, atol=0, rtol=0)
     check_error(lib.infiniopDestroyGatherDescriptor(descriptor))
 

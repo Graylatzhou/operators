@@ -27,7 +27,7 @@ __C __export infiniopStatus_t infiniopCreateReduceminDescriptor(
     };
     return STATUS_SUCCESS;
 }
-__C __export infiniopStatus_t infiniopReducemin(infiniopReduceminDescriptor_t desc, void *y, void const *x, void const *dynamic_axes, uint64_t dynamic_axes_size, void *stream) {
+__C __export infiniopStatus_t infiniopReducemin(infiniopReduceminDescriptor_t desc, void *y, void *x, void *dynamic_axes, uint64_t dynamic_axes_size, void *stream) {
     auto _desc = (_ReduceminDescriptor_t) desc;
     CHECK_STATUS(infiniopReduce(_desc->reduce_desc, y, x, dynamic_axes, dynamic_axes_size, stream), STATUS_SUCCESS);
     return STATUS_SUCCESS;

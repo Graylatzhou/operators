@@ -1,0 +1,33 @@
+#ifndef __CUDA_CLIP_H__
+#define __CUDA_CLIP_H__
+
+#include "../../../devices/cuda/cuda_handle.h"
+#include "operators.h"
+#include <memory>
+
+typedef struct ClipCudaDescriptor {
+    Device device;
+    DT dtype;
+    uint64_t ndim;
+    uint64_t element_num;
+} ClipCudaDescriptor;
+
+typedef struct ClipCudaDescriptor *ClipCudaDescriptor_t;
+
+infiniopStatus_t cudaCreateClipDescriptor(CudaHandle_t handle,
+                                            ClipCudaDescriptor_t *desc_ptr,
+                                            infiniopTensorDescriptor_t x,
+                                            infiniopTensorDescriptor_t y
+                                            );
+
+
+infiniopStatus_t cudaClip(ClipCudaDescriptor_t desc,
+                            void *x,
+                            void *y,
+                            float *min,
+                            float *max,
+                            void *stream);
+
+infiniopStatus_t cudaDestroyClipDescriptor(ClipCudaDescriptor_t desc);
+
+#endif// __CUDA_MATMUL_H__

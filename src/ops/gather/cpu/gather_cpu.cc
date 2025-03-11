@@ -32,6 +32,7 @@ infiniopStatus_t cpuCreateGatherDescriptor(infiniopHandle_t handle,
     *desc_ptr = new GatherCpuDescriptor{
         DevCpu,
         y->dt,
+        indices->dt,
         dst_shape,
         src_shape,
         indices_shape,
@@ -51,14 +52,14 @@ infiniopStatus_t cpuDestroyGatherDescriptor(GatherCpuDescriptor_t desc){
     return STATUS_SUCCESS;
 }
 
-template<typename Tdata>
+template<typename Tdata, typename Tindices>
 infiniopStatus_t gather_cpu(GatherCpuDescriptor_t desc,
-    void const *x, 
+    void *x, 
     void *indices,
     void *y)
 {
-    auto *src_data = reinterpret_cast<Tdata const*>(x);
-    auto *indices_data = reinterpret_cast<int64_t*>(indices); // [!code ++]
+    auto *src_data = reinterpret_cast<Tdata*>(x);
+    auto *indices_data = reinterpret_cast<Tindices*>(indices); // [!code ++]
     auto *dst_data = reinterpret_cast<Tdata*>(y);
     uint64_t indices_element_count = 1;
     for (uint64_t i = 0; i < desc->indices_ndim; ++i) {
@@ -95,15 +96,25 @@ infiniopStatus_t gather_cpu(GatherCpuDescriptor_t desc,
 }
 
 infiniopStatus_t cpuGather(GatherCpuDescriptor_t desc,
-    void const *x, 
+    void *x, 
     void *indices,
     void *y,
     void *stream){
     if (desc->dtype == F16){
-        return gather_cpu<uint16_t>(desc, x, indices, y);
+        if (desc->indices_dtype == I32){
+            return gather_cpu<uint16_t, int32_t>(desc, x, indices, y);
+        }
+        else if (desc->indices_dtype == I64){
+            return gather_cpu<uint16_t, int64_t>(desc, x, indices, y);
+        }
     }
     if (desc->dtype == F32){
-        return gather_cpu<float>(desc, x, indices, y);
+        if (desc->indices_dtype == I32){
+            return gather_cpu<float, int32_t>(desc, x, indices, y);
+        }
+        else if (desc->indices_dtype == I64){
+            return gather_cpu<float, int64_t>(desc, x, indices, y);
+        }
     }
     return STATUS_SUCCESS;
 }

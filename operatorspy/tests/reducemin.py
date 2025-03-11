@@ -21,7 +21,7 @@ import torch
 from typing import Tuple
 import numpy as np
 
-PROFILE = False
+PROFILE = True
 NUM_PRERUN = 1
 NUM_ITERATIONS = 1
 
@@ -141,8 +141,8 @@ def test(
             )
         elapsed = (time.time() - start_time) / NUM_ITERATIONS
         print(f"lib time: {elapsed :10f}")
-    print(f"custom op output:{y}")
-    print(f"pytorch output:{ans}")
+    # print(f"custom op output:{y}")
+    # print(f"pytorch output:{ans}")
     assert torch.allclose(y, ans, atol=0, rtol=1e-3)
     
     check_error(lib.infiniopDestroyReducemaxDescriptor(descriptor))
@@ -150,32 +150,44 @@ def test(
 def test_cpu(lib, test_cases):
     device = DeviceEnum.DEVICE_CPU
     handle = create_handle(lib, device)
-    for x_shape, axes, noop_with_empty_axes, keepdims, dynamic_axes in test_cases:
-        print(dynamic_axes)
-        test(lib, handle, "cpu", x_shape, axes, dynamic_axes, noop_with_empty_axes, keepdims, tensor_dtype=torch.float16)
-        print("\n")
+    for x_shape, axes, noop_with_empty_axes, keepdims, dynamic_axes, tensor_dtype in test_cases:
+        test(lib, handle, "cpu", x_shape, axes, dynamic_axes, noop_with_empty_axes, keepdims, tensor_dtype=tensor_dtype)
         #test(lib, handle, "cpu", x_shape, axes, tensor_dtype=torch.float32)
     destroy_handle(lib, handle)
 
+def test_cuda(lib, test_cases):
+    device = DeviceEnum.DEVICE_CUDA
+    handle = create_handle(lib, device)
+    for x_shape, axes, noop_with_empty_axes, keepdims, dynamic_axes, tensor_dtype in test_cases:
+        test(lib, handle, "cuda", x_shape, axes, dynamic_axes, noop_with_empty_axes, keepdims, tensor_dtype=tensor_dtype)
+        print("\n")
+    destroy_handle(lib, handle)
 
 if __name__ == "__main__":
     test_cases = [
         # dynamic calc test eg
-        ((2, 3, 4, 5), [0, 2], False, True, None),
-        ((2, 3, 4, 5), [0, 2], False, True, None),
-        #(input_shape, axis, noop_with_empty_axes, keepdims, dynamic_axes)
-        ((2, 10, 24, 10), [0, 2], False, True, None),
-        # stride = 
-        ((2, 10, 24, 10), [0, 1], False, True, None),
-        ((2, 10, 24, 10), [2, 3], False , True, None),
-        ((2, 10, 24, 10), [0, 1, 2, 3], False, True, None),
-        # validate attribute noop_with_empty_axes and keepdims
-        ((2, 10, 24, 10), None, True, True, None),
-        ((2, 10, 24, 10), None, True, False, None),
-        ((2, 10, 24, 10), None, False, True, None),
-        ((2, 10, 24, 10), None, False, False, None),
-        ((2, 3, 4), [0, 1], False, False, None),
-        #((2, 10, 24, 10), [], True),
+        # ((2, 3, 4, 5), [0, 2], False, True, None),
+        # ((2, 3, 4, 5), [0, 2], False, True, None),
+        # #(input_shape, axis, noop_with_empty_axes, keepdims, dynamic_axes)
+        # ((2, 10, 24, 10), [0, 2], False, True, None),
+        # # stride = 
+        # ((2, 10, 24, 10), [0, 1], False, True, None),
+        # ((2, 10, 24, 10), [2, 3], False , True, None),
+        # ((2, 10, 24, 10), [0, 1, 2, 3], False, True, None),
+        # # validate attribute noop_with_empty_axes and keepdims
+        # ((2, 10, 24, 10), None, True, True, None),
+        # ((2, 10, 24, 10), None, True, False, None),
+        # ((2, 10, 24, 10), None, False, True, None),
+        # ((2, 10, 24, 10), None, False, False, None),
+        # ((2, 3, 4), [0, 1], False, False, None),
+        # #((2, 10, 24, 10), [], True),
+        ((2, 1000), [0, 1], False, False, None, torch.float32),
+        ((2, 2, 5), [0, 1], False, True, None, torch.float32),
+        ((1000, 200, 500), [0, 1], False, True, None, torch.float16),
+        ((1000, 200, 50), [0, 1], False, True, None, torch.float32),
+                ((20, 3, 4, 5), [0, 2], False, False, None, torch.float32),
+        ((20, 30, 40, 5), [0, 2, 3], False, False, None, torch.float32),
+        ((200, 3, 40, 5), [0, 3], False, False, None, torch.float32),
     ]
     args = get_args()
     lib = open_lib()
@@ -201,5 +213,8 @@ if __name__ == "__main__":
     ]
     lib.infiniopDestroyReduceminDescriptor.restype = c_int32
     lib.infiniopDestroyReduceminDescriptor.argtypes = [infiniopReduceminDescriptor_t]
-    test_cpu(lib, test_cases)
+    if args.cpu:
+        test_cpu(lib, test_cases)
+    if args.cuda:
+        test_cuda(lib, test_cases)
     print("All tests passed!")

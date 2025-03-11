@@ -5,6 +5,7 @@
 struct GatherCpuDescriptor {
     Device device;
     DT dtype;
+    DT indices_dtype;
     uint64_t const *dst_shape;
     uint64_t const *src_shape;
     uint64_t const *indices_shape;
@@ -25,7 +26,7 @@ infiniopStatus_t cpuCreateGatherDescriptor(infiniopHandle_t handle,
                                         );
 
 infiniopStatus_t cpuGather(GatherCpuDescriptor_t desc,
-                                  void const *data, 
+                                  void *data, 
                                   void *indices,
                                   void *dst,
                                   void *stream);

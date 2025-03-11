@@ -18,8 +18,8 @@ infiniopStatus_t cpuCreateClipDescriptor(infiniopHandle_t handle,
 
 infiniopStatus_t cpuClip(ClipCpuDescriptor_t desc,
                                   void const *x, 
-                                  void *min,
-                                  void *max,
+                                  float *min,
+                                  float *max,
                                   void *y,
                                   void *stream);
 

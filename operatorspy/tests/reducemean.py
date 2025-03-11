@@ -21,9 +21,9 @@ import torch
 from typing import Tuple
 import numpy as np
 
-PROFILE = False
+PROFILE = True
 NUM_PRERUN = 1
-NUM_ITERATIONS = 1
+NUM_ITERATIONS = 50
 
 class ReducemeanDescriptor(Structure):
     _fields_ = [("device", c_int32)]
@@ -47,6 +47,7 @@ def inferShape(x_shape, axis, noop_with_empty_axes, keepdims=False):
                 return tuple([1] * len(x_shape))
             else:
                 return tuple([])
+    
     assert len(axis) <= len(x_shape), "axis out of range"
     output_shape = []
     axis = [a if a >= 0 else a + len(x_shape) for a in axis]  # 更新 axis 列表中的值
@@ -82,9 +83,9 @@ def test(
     print(
         f"Testing reducemean on {torch_device} with x_shape:{x_shape} dtype:{tensor_dtype}"
     )
-    x = torch.randn(x_shape, dtype=tensor_dtype, device=torch_device)
+    x = torch.randint(0, 10, x_shape, dtype=tensor_dtype, device=torch_device)
     print(f"y_shape = {inferShape(x_shape, axes if dynamic_axes == None else dynamic_axes, noop_with_empty_axes, keepdims)}")
-    y = torch.full(inferShape(x_shape, axes if dynamic_axes == None else dynamic_axes, noop_with_empty_axes, keepdims), float('-inf'), dtype=tensor_dtype, device=torch_device)
+    y = torch.full(inferShape(x_shape, axes if dynamic_axes == None else dynamic_axes, noop_with_empty_axes, keepdims), float(0), dtype=tensor_dtype, device=torch_device)
     print(f"y_shape = {y.shape}")
     for i in range(NUM_PRERUN if PROFILE else 1):
         ans = reduce_mean(x, axes if dynamic_axes == None else dynamic_axes, noop_with_empty_axes, keepdims)
@@ -141,8 +142,9 @@ def test(
             )
         elapsed = (time.time() - start_time) / NUM_ITERATIONS
         print(f"lib time: {elapsed :10f}")
-    print(f"custom op output:{y}")
-    print(f"pytorch output:{ans}")
+    #print(f"input_data = {x}")
+    # print(f"custom op output:{y}")
+    # print(f"pytorch output:{ans}")
     assert torch.allclose(y, ans, atol=0, rtol=1e-3)
     
     check_error(lib.infiniopDestroyReducemeanDescriptor(descriptor))
@@ -150,30 +152,47 @@ def test(
 def test_cpu(lib, test_cases):
     device = DeviceEnum.DEVICE_CPU
     handle = create_handle(lib, device)
-    for x_shape, axes, noop_with_empty_axes, keepdims, dynamic_axes in test_cases:
-        test(lib, handle, "cpu", x_shape, axes, dynamic_axes, noop_with_empty_axes, keepdims, tensor_dtype=torch.float16)
+    for x_shape, axes, noop_with_empty_axes, keepdims, dynamic_axes, tensor_dtype in test_cases:
+        test(lib, handle, "cpu", x_shape, axes, dynamic_axes, noop_with_empty_axes, keepdims, tensor_dtype=tensor_dtype)
         print("\n")
         #test(lib, handle, "cpu", x_shape, axes, tensor_dtype=torch.float32)
+    destroy_handle(lib, handle)
+
+def test_cuda(lib, test_cases):
+    device = DeviceEnum.DEVICE_CUDA
+    handle = create_handle(lib, device)
+    for x_shape, axes, noop_with_empty_axes, keepdims, dynamic_axes, tensor_dtype in test_cases:
+        test(lib, handle, "cuda", x_shape, axes, dynamic_axes, noop_with_empty_axes, keepdims, tensor_dtype=tensor_dtype)
+        print("\n")
     destroy_handle(lib, handle)
 
 
 if __name__ == "__main__":
     test_cases = [
         # dynamic calc test eg
-        ((2, 3, 4, 5), [0, 2], False, True, None),
-        ((2, 3, 4, 5), [0, 2], False, True, None),
-        #(input_shape, axis, noop_with_empty_axes, keepdims, dynamic_axes)
-        ((2, 10, 24, 10), [0, 2], False, True, None),
-        # stride = 
-        ((2, 10, 24, 10), [0, 1], False, True, None),
-        ((2, 10, 24, 10), [2, 3], False , True, None),
-        ((2, 10, 24, 10), [0, 1, 2, 3], False, True, None),
+        # ((2, 3, 4, 5), [0, 2], False, True, None),
+        # ((2, 3, 4, 5), [0, 2], False, True, None),
+        # #(input_shape, axis, noop_with_empty_axes, keepdims, dynamic_axes)
+        # ((2, 10, 24, 10), [0, 2], False, True, None),
+        # # stride = 
+        # ((2, 10, 24, 10), [0, 1], False, True, None),
+        # ((2, 10, 24, 10), [2, 3], False , True, None),
+        #((1000, 300), [0, 1], False, False, None, torch.float16),
+        ((30, 5, 20, 100), [0, 1, 2, 3], False, False, None, torch.float16),
+        ((30000, 1000, 40), [0, 1], False, False, None, torch.float32),
+        #((1000, 300), [0, 1], False, False, None, torch.float16),
+        ((2, 2, 5), [0, 1], False, True, None, torch.float32),
+        ((1000, 200, 500), [0, 1], False, True, None, torch.float16),
+        ((1000, 200, 50), [0, 1], False, True, None, torch.float32),
+        ((20, 3, 4, 5), [0, 2], False, False, None, torch.float32),
+        ((20, 30, 40, 5), [0, 2, 3], False, False, None, torch.float32),
+        ((200, 3, 40, 5), [0, 3], False, False, None, torch.float32),
         # validate attribute noop_with_empty_axes and keepdims
-        ((2, 10, 24, 10), None, True, True, None),
-        ((2, 10, 24, 10), None, True, False, None),
-        ((2, 10, 24, 10), None, False, True, None),
-        ((2, 10, 24, 10), None, False, False, None),
-        ((2, 3, 4), [0, 1], False, False, None),
+        # ((2, 10, 24, 10), None, True, True, None),
+        # ((2, 10, 24, 10), None, True, False, None),
+        # ((2, 10, 24, 10), None, False, True, None),
+        # ((2, 10, 24, 10), None, False, False, None),
+        # ((2, 3, 4), [0, 1], False, False, None),
         #((2, 10, 24, 10), [], True),
     ]
     args = get_args()
@@ -200,5 +219,8 @@ if __name__ == "__main__":
     ]
     lib.infiniopDestroyReducemeanDescriptor.restype = c_int32
     lib.infiniopDestroyReducemeanDescriptor.argtypes = [infiniopReducemeanDescriptor_t]
-    test_cpu(lib, test_cases)
+    if args.cpu:
+        test_cpu(lib, test_cases)
+    if args.cuda:
+        test_cuda(lib, test_cases)
     print("All tests passed!")

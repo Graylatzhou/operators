@@ -214,8 +214,8 @@ infiniopStatus_t reduce_cpu(ReduceCpuDescriptor_t desc,
 
 infiniopStatus_t cpuReduce(ReduceCpuDescriptor_t desc,
                             void *y,
-                            void const *x,
-                            void const *dynamic_axes,
+                            void *x,
+                            void *dynamic_axes,
                             uint64_t dynamic_axes_size,
                             void *stream){
     if (desc->is_axes_static == true && dynamic_axes_size > 0){

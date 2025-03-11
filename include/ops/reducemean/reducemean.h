@@ -19,7 +19,7 @@ __C __export infiniopStatus_t infiniopCreateReducemeanDescriptor(infiniopHandle_
                                                                 bool noop_with_empty_axes
                                                                 );
 
-__C __export infiniopStatus_t infiniopReducemean(infiniopReducemeanDescriptor_t desc, void *dst, void const *src, void const *dynamic_axes, uint64_t dynamic_axes_size, void *stream);
+__C __export infiniopStatus_t infiniopReducemean(infiniopReducemeanDescriptor_t desc, void *dst, void *src, void *dynamic_axes, uint64_t dynamic_axes_size, void *stream);
 
 __C __export infiniopStatus_t infiniopDestroyReducemeanDescriptor(infiniopReducemeanDescriptor_t desc);
 #endif

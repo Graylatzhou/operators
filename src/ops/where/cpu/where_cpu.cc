@@ -9,6 +9,9 @@ infiniopStatus_t cpuCreateWhereDescriptor(infiniopHandle_t handle,
     infiniopTensorDescriptor_t src2,
     infiniopTensorDescriptor_t condition
     ){
+    if (!isValidBroadcastShape(dst, src1) || !isValidBroadcastShape(dst, src2) || !isValidBroadcastShape(dst, condition)) {
+        return STATUS_BAD_TENSOR_SHAPE;
+    }
     if (dst->dt != F16 && dst->dt != F32) {
         return STATUS_BAD_TENSOR_DTYPE;
     }
@@ -31,47 +34,41 @@ infiniopStatus_t cpuCreateWhereDescriptor(infiniopHandle_t handle,
     uint64_t *src2_shape = new uint64_t[dst->ndim];
     uint64_t *condition_shape = new uint64_t[dst->ndim];
     uint64_t *dst_shape = new uint64_t[dst->ndim];
+
     int64_t *dst_strides = new int64_t[dst->ndim];
+    int64_t *src1_strides = new int64_t[src1->ndim];
+    int64_t *src2_strides = new int64_t[src2->ndim];
+    int64_t *condition_strides = new int64_t[condition->ndim];
     uint64_t dst_ndim = dst->ndim;
     uint64_t element_num = 1;
     for (uint64_t i = 0; i < dst->ndim; i++) {
         element_num *= dst->shape[i];
     }
+
     memcpy(src1_shape, src1->shape, src1->ndim * sizeof(uint64_t));
     memcpy(src2_shape, src2->shape, src2->ndim * sizeof(uint64_t));
-    memcpy(condition_shape, condition->shape, condition->ndim * sizeof(uint8_t));
-    //扩展到dst的维度
-    for (uint64_t i = 0; i < dst->ndim; i++) {
-        if (i < src1->ndim){
-            src1_shape[i] = src1->shape[i];
-        }
-        else{
-            src1_shape[i] = 1;
-        }
-        if (i < src2->ndim){
-            src2_shape[i] = src2->shape[i];
-        }
-        else{
-            src2_shape[i] = 1;
-        }
-        if (i < condition->ndim){
-            condition_shape[i] = condition->shape[i];
-        }
-        else{
-            condition_shape[i] = 1;
-        }
-    }
+    memcpy(condition_shape, condition->shape, condition->ndim * sizeof(uint64_t));
     memcpy(dst_shape, dst->shape, dst->ndim * sizeof(uint64_t));
+
     memcpy(dst_strides, dst->strides, dst->ndim * sizeof(int64_t));
+    memcpy(src1_strides, src1->strides, src1->ndim * sizeof(int64_t));
+    memcpy(src2_strides, src2->strides, src2->ndim * sizeof(int64_t));
+    memcpy(condition_strides, condition->strides, condition->ndim * sizeof(int64_t));
     *desc_ptr = new WhereCpuDescriptor{
-        DevCpu,
+        handle->device,
         dst->dt,
         src1_shape,
         src2_shape,
         condition_shape,
         dst_shape,
         dst_strides,
+        src1_strides,
+        src2_strides,
+        condition_strides,
         dst_ndim,
+        src1->ndim,
+        src2->ndim,
+        condition->ndim,
         element_num
     };
     return STATUS_SUCCESS;
@@ -83,9 +80,33 @@ infiniopStatus_t cpuDestroyWhereDescriptor(WhereCpuDescriptor_t desc){
     delete[] desc->condition_shape;
     delete[] desc->dst_shape;
     delete[] desc->dst_strides;
+    delete[] desc->src1_strides;
+    delete[] desc->src2_strides;
+    delete[] desc->condition_strides;
     delete desc;
     return STATUS_SUCCESS;
 }
+inline uint64_t broadcast_map(
+    uint64_t idx, 
+    const uint64_t* dst_shape,     
+    uint64_t dst_ndim,             
+    const uint64_t* input_shape,   
+    const int64_t* input_strides,  
+    uint64_t input_ndim            
+) {
+    uint64_t index = 0;
+    const int offset = dst_ndim - input_ndim;
+    for (int i = dst_ndim - 1; i >= 0; idx /= dst_shape[i--]) {
+        const uint64_t coord = idx % dst_shape[i];
+        if (i >= offset) { 
+            const int dim = i - offset;
+            const uint64_t size = input_shape[dim];
+            index += (size == 1 ? 0 : coord % size) * input_strides[dim];
+        }
+    }
+    return index;
+}
+
 
 template<typename Tdata>
 infiniopStatus_t where_cpu(WhereCpuDescriptor_t desc,
@@ -98,31 +119,11 @@ infiniopStatus_t where_cpu(WhereCpuDescriptor_t desc,
     auto src1_ = reinterpret_cast<Tdata *>(src1);
     auto src2_ = reinterpret_cast<Tdata *>(src2);
     auto condition_ = reinterpret_cast<uint8_t *>(condition);
-    auto ndim = desc->dst_ndim;
-    auto dst_strides = desc->dst_strides;
-    auto condition_shape = desc->condition_shape;
-    auto src1_shape = desc->src1_shape;
-    auto src2_shape = desc->src2_shape;
     #pragma omp parallel for
     for (uint64_t i = 0; i < desc->element_num; i++) {
-        std::vector<int> indices(ndim, 0);
-        int global_index = i;
-        for (int z = 0; z <= ndim - 1; z++){
-            indices[z] = global_index / dst_strides[z];
-            global_index %= dst_strides[z];
-        }
-        uint64_t condition_index = 0, src1_index = 0, src2_index = 0;
-        for (int j = 0; j < ndim; j++) {
-            if (condition_shape[j] != 1){
-                condition_index = condition_index * condition_shape[j] + indices[j];
-            }
-            if (src1_shape[j] != 1){
-                src1_index = src1_index * src1_shape[j] + indices[j];
-            }
-            if (src2_shape[j] != 1){
-                src2_index = src2_index * src2_shape[j] + indices[j];
-            }
-        }
+        uint64_t condition_index = broadcast_map(i, desc->dst_shape, desc->dst_ndim, desc->condition_shape, desc->condition_strides, desc->condition_ndim);
+        uint64_t src1_index = broadcast_map(i, desc->dst_shape, desc->dst_ndim, desc->src1_shape, desc->src1_strides, desc->src1_ndim);
+        uint64_t src2_index = broadcast_map(i, desc->dst_shape, desc->dst_ndim, desc->src2_shape, desc->src2_strides, desc->src2_ndim);
         dst_[i] = condition_[condition_index] ? src1_[src1_index] : src2_[src2_index];
     }
     return STATUS_SUCCESS;

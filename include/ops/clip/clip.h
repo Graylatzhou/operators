@@ -15,7 +15,7 @@ __C __export infiniopStatus_t infiniopCreateClipDescriptor(infiniopHandle_t hand
                                                                 infiniopTensorDescriptor_t y
                                                                 );
 
-__C __export infiniopStatus_t infiniopClip(infiniopClipDescriptor_t desc, void const *x, void *min, void *max, void *y, void *stream);
+__C __export infiniopStatus_t infiniopClip(infiniopClipDescriptor_t desc, void *x, float *min, float *max, void *y, void *stream);
 
 __C __export infiniopStatus_t infiniopDestroyClipDescriptor(infiniopClipDescriptor_t desc);
 
