@@ -34,7 +34,7 @@ __C infiniopStatus_t infiniopCreateReduceDescriptor(
     return STATUS_BAD_DEVICE;
 }
 
-__C infiniopStatus_t infiniopReduce(infiniopReduceDescriptor_t desc, void *y, void *x, void *dynamic_axes, uint64_t dynamic_axes_size, void *stream) {
+__C infiniopStatus_t infiniopReduce(infiniopReduceDescriptor_t desc, void *y, const void *x, void *dynamic_axes, uint64_t dynamic_axes_size, void *stream) {
     switch (desc->device) {
 #ifdef ENABLE_CPU
         case DevCpu:

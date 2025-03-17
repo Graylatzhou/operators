@@ -8,6 +8,8 @@
 
 #define FLOAT4(value) (reinterpret_cast<float4*>(&(value))[0])
 #define LDST128BITS(value) (reinterpret_cast<float4*>(&(value))[0])
+#define FLOAT4_CONST(value) (reinterpret_cast<const float4*>(&(value))[0])
+#define LDST128BITS_CONST(value) (reinterpret_cast<const float4*>(&(value))[0])
 
 enum class ReduceOp {
     SUM,
@@ -207,7 +209,7 @@ __global__ void block_final_reduce_kernel(half *temp_in, half *y, int num_blocks
 }
 
 template <ReduceOp Op>
-__global__ void blockall_reduce_f32x4_kernel(float *x, float *y, uint64_t N){
+__global__ void blockall_reduce_f32x4_kernel(const float *x, float *y, uint64_t N){
     int tid = threadIdx.x;
     int base_idx = (tid + 64 * blockIdx.x) * 4;
     constexpr int NUM_WARPS = (64 + WARP_SIZE - 1) / WARP_SIZE;
@@ -215,7 +217,7 @@ __global__ void blockall_reduce_f32x4_kernel(float *x, float *y, uint64_t N){
     float result = init_value<Op, float>();
     if (base_idx < N){
         if (base_idx + 3 < N){
-            float4 reg_x = FLOAT4(x[base_idx]);
+            float4 reg_x = FLOAT4_CONST(x[base_idx]);
             if constexpr (Op == ReduceOp::SUM || Op == ReduceOp::MEAN) {
                 result += reg_x.x + reg_x.y + reg_x.z + reg_x.w;
             } else if constexpr (Op == ReduceOp::MAX) {
@@ -251,7 +253,7 @@ __global__ void blockall_reduce_f32x4_kernel(float *x, float *y, uint64_t N){
 
 // blockallreduce kernel for half(f16x8) using template operations
 template <ReduceOp Op, typename T>
-__global__ void blockall_reduce_f16x8_kernel(half *x, T *y, uint64_t N){
+__global__ void blockall_reduce_f16x8_kernel(const half *x, T *y, uint64_t N){
     int tid = threadIdx.x;
     int base_idx = (tid + 32 * blockIdx.x) * 8;
     constexpr int NUM_WARPS = (32 + WARP_SIZE - 1) / WARP_SIZE;
@@ -260,7 +262,7 @@ __global__ void blockall_reduce_f16x8_kernel(half *x, T *y, uint64_t N){
     if (base_idx < N){
         if (base_idx + 7 < N){
             half pack_x[8];
-            LDST128BITS(pack_x[0]) = LDST128BITS(x[base_idx]);
+            LDST128BITS(pack_x[0]) = LDST128BITS_CONST(x[base_idx]);
             #pragma unroll
             for (int i = 0; i < 8; i++){
                 if constexpr (std::is_same<T, half>::value) {
@@ -305,7 +307,7 @@ __global__ void blockall_reduce_f16x8_kernel(half *x, T *y, uint64_t N){
 
 template <ReduceOp Op>
 __global__ void reduce_f32x4_contigous_kernel(
-    float *x, float *y,
+    const float *x, float *y,
     int prefix_size, int suffix_size,
     uint64_t output_size, uint64_t reduce_size){
 
@@ -344,7 +346,7 @@ __global__ void reduce_f32x4_contigous_kernel(
 
 template <ReduceOp Op>
 __global__ void reduce_f16x8_contigous_kernel(
-    half *x, half *y,
+    const half *x, half *y,
     int prefix_size, int suffix_size,
     uint64_t output_size, uint64_t reduce_size){
     extern __shared__ float shared_mem_half[];
@@ -385,7 +387,7 @@ output_idx = 0
 */
 template<ReduceOp Op, bool KeepDims>
 __global__ void reduce_f32_kernel(
-    float *x, float *y,
+    const float *x, float *y,
     const int64_t *x_strides, const int64_t *y_strides,
     const uint64_t reduce_size, const uint64_t output_size,
     const int64_t *non_reduce_axes,
@@ -424,9 +426,7 @@ __global__ void reduce_f32_kernel(
             offset += coord * x_strides[axis];
             remaining %= reduce_axes_stride[j];
         }
-
         result = reduce_op<Op>(result, x[offset]);
-
     }
     shared_mem_float[tid] = result;
     __syncthreads();
@@ -449,8 +449,8 @@ __global__ void reduce_f32_kernel(
 template<typename Tdata>
 infiniopStatus_t reduce_nv_gpu(
     ReduceCudaDescriptor_t desc,
-    void *x,
     void *y,
+    void const *x,
     void *stream){
     uint64_t N = desc->element_num;
     if (desc->reduce_mode == 0){
@@ -458,16 +458,16 @@ infiniopStatus_t reduce_nv_gpu(
             dim3 block(256 / 4);
             dim3 grid((N + block.x * 4 - 1) / (block.x * 4));
             if (desc->reduce_op_type == 0) {
-                blockall_reduce_f32x4_kernel<ReduceOp::MEAN><<<grid, block, 0, (cudaStream_t)stream>>>(reinterpret_cast<float *>(x), reinterpret_cast<float *>(y), N);
+                blockall_reduce_f32x4_kernel<ReduceOp::MEAN><<<grid, block, 0, (cudaStream_t)stream>>>(reinterpret_cast<const float *>(x), reinterpret_cast<float *>(y), N);
                 divide_by_n_kernel<<<1, 1, 0, (cudaStream_t)stream>>>(
                     reinterpret_cast<float *>(y), N);
             } else if (desc->reduce_op_type == 1 || desc->reduce_op_type == 2) {
                 float* temp_buffer;
                 cudaMalloc(&temp_buffer, grid.x * sizeof(float));
                 if (desc->reduce_op_type == 1) {            
-                    blockall_reduce_f32x4_kernel<ReduceOp::MAX><<<grid, block, 0, (cudaStream_t)stream>>>(reinterpret_cast<float *>(x), temp_buffer, N);
+                    blockall_reduce_f32x4_kernel<ReduceOp::MAX><<<grid, block, 0, (cudaStream_t)stream>>>(reinterpret_cast<const float *>(x), temp_buffer, N);
                 } else if (desc->reduce_op_type == 2) {
-                    blockall_reduce_f32x4_kernel<ReduceOp::MIN><<<grid, block, 0, (cudaStream_t)stream>>>(reinterpret_cast<float *>(x), temp_buffer, N);
+                    blockall_reduce_f32x4_kernel<ReduceOp::MIN><<<grid, block, 0, (cudaStream_t)stream>>>(reinterpret_cast<const float *>(x), temp_buffer, N);
                 }
                 int num_blocks = grid.x;
                 if (num_blocks <= 32) {
@@ -495,16 +495,16 @@ infiniopStatus_t reduce_nv_gpu(
             if (desc->reduce_op_type == 0) {
                 float* temp_buffer;
                 cudaMalloc(&temp_buffer, sizeof(float));
-                blockall_reduce_f16x8_kernel<ReduceOp::MEAN, float><<<grid, block, 0, (cudaStream_t)stream>>>(reinterpret_cast<half *>(x), temp_buffer, N);
+                blockall_reduce_f16x8_kernel<ReduceOp::MEAN, float><<<grid, block, 0, (cudaStream_t)stream>>>(reinterpret_cast<const half *>(x), temp_buffer, N);
                 divide_by_n_kernel<<<1, 1, 0, (cudaStream_t)stream>>>(
                     reinterpret_cast<half *>(y), temp_buffer, N);
             } else if (desc->reduce_op_type == 1 || desc->reduce_op_type == 2) {
                 half *temp_buffer;
                 cudaMalloc(&temp_buffer, grid.x * sizeof(half));
                 if (desc->reduce_op_type == 1) {
-                    blockall_reduce_f16x8_kernel<ReduceOp::MAX, half><<<grid, block, 0, (cudaStream_t)stream>>>(reinterpret_cast<half *>(x), reinterpret_cast<half *>(temp_buffer), N);
+                    blockall_reduce_f16x8_kernel<ReduceOp::MAX, half><<<grid, block, 0, (cudaStream_t)stream>>>(reinterpret_cast<const half *>(x), reinterpret_cast<half *>(temp_buffer), N);
                 } else if (desc->reduce_op_type == 2) {
-                    blockall_reduce_f16x8_kernel<ReduceOp::MIN, half><<<grid, block, 0, (cudaStream_t)stream>>>(reinterpret_cast<half *>(x), reinterpret_cast<half *>(temp_buffer), N);
+                    blockall_reduce_f16x8_kernel<ReduceOp::MIN, half><<<grid, block, 0, (cudaStream_t)stream>>>(reinterpret_cast<const half *>(x), reinterpret_cast<half *>(temp_buffer), N);
                 }
                 int num_blocks = grid.x;
                 if (num_blocks <= 32) {
@@ -536,13 +536,13 @@ infiniopStatus_t reduce_nv_gpu(
             size_t shared_mem_size = block.x * sizeof(float);
             if (desc->reduce_op_type == 0) {
                 reduce_f32x4_contigous_kernel<ReduceOp::MEAN><<<grid, block, shared_mem_size, (cudaStream_t)stream>>>(
-                    reinterpret_cast<float *>(x), reinterpret_cast<float *>(y), desc->prefix_size, desc->suffix_size, desc->output_size, desc->reduce_size);
+                    reinterpret_cast<const float *>(x), reinterpret_cast<float *>(y), desc->prefix_size, desc->suffix_size, desc->output_size, desc->reduce_size);
             } else if (desc->reduce_op_type == 1) {
                 reduce_f32x4_contigous_kernel<ReduceOp::MAX><<<grid, block, shared_mem_size, (cudaStream_t)stream>>>(
-                    reinterpret_cast<float *>(x), reinterpret_cast<float *>(y), desc->prefix_size, desc->suffix_size, desc->output_size, desc->reduce_size);
+                    reinterpret_cast<const float *>(x), reinterpret_cast<float *>(y), desc->prefix_size, desc->suffix_size, desc->output_size, desc->reduce_size);
             } else if (desc->reduce_op_type == 2) {
                 reduce_f32x4_contigous_kernel<ReduceOp::MIN><<<grid, block, shared_mem_size, (cudaStream_t)stream>>>(
-                    reinterpret_cast<float *>(x), reinterpret_cast<float *>(y), desc->prefix_size, desc->suffix_size, desc->output_size, desc->reduce_size);
+                    reinterpret_cast<const float *>(x), reinterpret_cast<float *>(y), desc->prefix_size, desc->suffix_size, desc->output_size, desc->reduce_size);
             }
         } else {
             dim3 block(128);
@@ -550,13 +550,13 @@ infiniopStatus_t reduce_nv_gpu(
             size_t shared_mem_size = block.x * sizeof(half);
             if (desc->reduce_op_type == 0) {
                 reduce_f16x8_contigous_kernel<ReduceOp::MEAN><<<grid, block, shared_mem_size, (cudaStream_t)stream>>>(
-                    reinterpret_cast<half *>(x), reinterpret_cast<half *>(y), desc->prefix_size, desc->suffix_size, desc->output_size, desc->reduce_size);
+                    reinterpret_cast<const half *>(x), reinterpret_cast<half *>(y), desc->prefix_size, desc->suffix_size, desc->output_size, desc->reduce_size);
             }else if (desc->reduce_op_type == 1) {
                 reduce_f16x8_contigous_kernel<ReduceOp::MAX><<<grid, block, shared_mem_size, (cudaStream_t)stream>>>(
-                    reinterpret_cast<half *>(x), reinterpret_cast<half *>(y), desc->prefix_size, desc->suffix_size, desc->output_size, desc->reduce_size);
+                    reinterpret_cast<const half *>(x), reinterpret_cast<half *>(y), desc->prefix_size, desc->suffix_size, desc->output_size, desc->reduce_size);
             } else if (desc->reduce_op_type == 2) {
                 reduce_f16x8_contigous_kernel<ReduceOp::MIN><<<grid, block, shared_mem_size, (cudaStream_t)stream>>>(
-                    reinterpret_cast<half *>(x), reinterpret_cast<half *>(y), desc->prefix_size, desc->suffix_size, desc->output_size, desc->reduce_size);
+                    reinterpret_cast<const half *>(x), reinterpret_cast<half *>(y), desc->prefix_size, desc->suffix_size, desc->output_size, desc->reduce_size);
             }
         }
     }
@@ -569,38 +569,38 @@ infiniopStatus_t reduce_nv_gpu(
             if (desc->keepdims){
                 if (desc->reduce_op_type == 0) {
                     reduce_f32_kernel<ReduceOp::MEAN, true><<<grid, block, shared_mem_size, (cudaStream_t)stream>>>(
-                        reinterpret_cast<float *>(x), reinterpret_cast<float *>(y),
+                        reinterpret_cast<const float *>(x), reinterpret_cast<float *>(y),
                         desc->input_strides, desc->output_strides, desc->reduce_size, desc->output_size,
                         desc->non_reduce_axes, desc->axes_size, desc->reduce_axes_stride, desc->reduce_axes, desc->input_ndim, desc->element_num);
                 }
                 else if (desc->reduce_op_type == 1) {
                     reduce_f32_kernel<ReduceOp::MAX, true><<<grid, block, shared_mem_size, (cudaStream_t)stream>>>(
-                        reinterpret_cast<float *>(x), reinterpret_cast<float *>(y),
+                        reinterpret_cast<const float *>(x), reinterpret_cast<float *>(y),
                         desc->input_strides, desc->output_strides, desc->reduce_size, desc->output_size,
                         desc->non_reduce_axes, desc->axes_size, desc->reduce_axes_stride, desc->reduce_axes, desc->input_ndim, desc->element_num);
                 }
                 else if (desc->reduce_op_type == 2) {
                     reduce_f32_kernel<ReduceOp::MIN, true><<<grid, block, shared_mem_size, (cudaStream_t)stream>>>(
-                        reinterpret_cast<float *>(x), reinterpret_cast<float *>(y),
+                        reinterpret_cast<const float *>(x), reinterpret_cast<float *>(y),
                         desc->input_strides, desc->output_strides, desc->reduce_size, desc->output_size,
                         desc->non_reduce_axes, desc->axes_size, desc->reduce_axes_stride, desc->reduce_axes, desc->input_ndim, desc->element_num);
                 }
             }else{
                 if (desc->reduce_op_type == 0) {
                     reduce_f32_kernel<ReduceOp::MEAN, false><<<grid, block, shared_mem_size, (cudaStream_t)stream>>>(
-                        reinterpret_cast<float *>(x), reinterpret_cast<float *>(y),
+                        reinterpret_cast<const float *>(x), reinterpret_cast<float *>(y),
                         desc->input_strides, desc->output_strides, desc->reduce_size, desc->output_size,
                         desc->non_reduce_axes, desc->axes_size, desc->reduce_axes_stride, desc->reduce_axes, desc->input_ndim, desc->element_num);
                 }
                 else if (desc->reduce_op_type == 1) {
                     reduce_f32_kernel<ReduceOp::MAX, false><<<grid, block, shared_mem_size, (cudaStream_t)stream>>>(
-                        reinterpret_cast<float *>(x), reinterpret_cast<float *>(y),
+                        reinterpret_cast<const float *>(x), reinterpret_cast<float *>(y),
                         desc->input_strides, desc->output_strides, desc->reduce_size, desc->output_size,
                         desc->non_reduce_axes, desc->axes_size, desc->reduce_axes_stride, desc->reduce_axes, desc->input_ndim, desc->element_num);
                 }
                 else if (desc->reduce_op_type == 2) {
                     reduce_f32_kernel<ReduceOp::MIN, false><<<grid, block, shared_mem_size, (cudaStream_t)stream>>>(
-                        reinterpret_cast<float *>(x), reinterpret_cast<float *>(y),
+                        reinterpret_cast<const float *>(x), reinterpret_cast<float *>(y),
                         desc->input_strides, desc->output_strides, desc->reduce_size, desc->output_size,
                         desc->non_reduce_axes, desc->axes_size, desc->reduce_axes_stride, desc->reduce_axes, desc->input_ndim, desc->element_num);
                 }
@@ -613,13 +613,13 @@ infiniopStatus_t reduce_nv_gpu(
 infiniopStatus_t cudaReduce(
     ReduceCudaDescriptor_t desc,
     void *y,
-    void *x,
+    void const *x,
     void *stream){
     if (desc->dtype == F16) {
-        return reduce_nv_gpu<half>(desc, x, y, stream);
+        return reduce_nv_gpu<half>(desc, y, x, stream);
     }
     if (desc->dtype == F32) {
-        return reduce_nv_gpu<float>(desc, x, y, stream);
+        return reduce_nv_gpu<float>(desc, y, x, stream);
     }
     return STATUS_BAD_TENSOR_DTYPE;
 }

@@ -54,12 +54,12 @@ infiniopStatus_t cpuDestroyGatherDescriptor(GatherCpuDescriptor_t desc){
 
 template<typename Tdata, typename Tindices>
 infiniopStatus_t gather_cpu(GatherCpuDescriptor_t desc,
-    void *x, 
-    void *indices,
+    void const *x, 
+    void const *indices,
     void *y)
 {
-    auto *src_data = reinterpret_cast<Tdata*>(x);
-    auto *indices_data = reinterpret_cast<Tindices*>(indices); // [!code ++]
+    auto *src_data = reinterpret_cast<const Tdata*>(x);
+    auto *indices_data = reinterpret_cast<const Tindices*>(indices); // [!code ++]
     auto *dst_data = reinterpret_cast<Tdata*>(y);
     uint64_t indices_element_count = 1;
     for (uint64_t i = 0; i < desc->indices_ndim; ++i) {
@@ -96,8 +96,8 @@ infiniopStatus_t gather_cpu(GatherCpuDescriptor_t desc,
 }
 
 infiniopStatus_t cpuGather(GatherCpuDescriptor_t desc,
-    void *x, 
-    void *indices,
+    void const *x, 
+    void const *indices,
     void *y,
     void *stream){
     if (desc->dtype == F16){

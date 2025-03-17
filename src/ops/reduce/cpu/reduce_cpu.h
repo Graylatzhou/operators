@@ -44,7 +44,7 @@ infiniopStatus_t cpuCreateReduceDescriptor(infiniopHandle_t handle,
 
 infiniopStatus_t cpuReduce(ReduceCpuDescriptor_t desc,
                             void *y,
-                            void *x,
+                            void const *x,
                             void *dynamic_axes,
                             uint64_t dynamic_axes_size,
                             void *stream);

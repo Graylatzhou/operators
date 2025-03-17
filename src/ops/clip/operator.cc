@@ -32,7 +32,7 @@ __C infiniopStatus_t infiniopCreateClipDescriptor(
 }
 
 
-__C infiniopStatus_t infiniopClip(infiniopClipDescriptor_t desc, void *x, float *min, float *max, void *y, void *stream) {
+__C infiniopStatus_t infiniopClip(infiniopClipDescriptor_t desc, void const *x, float *min, float *max, void *y, void *stream) {
     switch (desc->device) {
 #ifdef ENABLE_CPU
         case DevCpu:

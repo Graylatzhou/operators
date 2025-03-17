@@ -19,7 +19,7 @@ __C __export infiniopStatus_t infiniopCreateReducemaxDescriptor(infiniopHandle_t
                                                                 bool noop_with_empty_axes
                                                                 );
 
-__C __export infiniopStatus_t infiniopReducemax(infiniopReducemaxDescriptor_t desc, void *y, void *x, void *dynamic_axes, uint64_t dynamic_axes_size, void *stream);
+__C __export infiniopStatus_t infiniopReducemax(infiniopReducemaxDescriptor_t desc, void *y, const void *x, void *dynamic_axes, uint64_t dynamic_axes_size, void *stream);
 
 __C __export infiniopStatus_t infiniopDestroyReducemaxDescriptor(infiniopReducemaxDescriptor_t desc);
 #endif

@@ -22,7 +22,7 @@ infiniopStatus_t cudaCreateClipDescriptor(CudaHandle_t handle,
 
 
 infiniopStatus_t cudaClip(ClipCudaDescriptor_t desc,
-                            void *x,
+                            void const *x,
                             void *y,
                             float *min,
                             float *max,

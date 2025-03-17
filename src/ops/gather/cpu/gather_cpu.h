@@ -26,8 +26,8 @@ infiniopStatus_t cpuCreateGatherDescriptor(infiniopHandle_t handle,
                                         );
 
 infiniopStatus_t cpuGather(GatherCpuDescriptor_t desc,
-                                  void *data, 
-                                  void *indices,
+                                  void const *data, 
+                                  void const *indices,
                                   void *dst,
                                   void *stream);
 

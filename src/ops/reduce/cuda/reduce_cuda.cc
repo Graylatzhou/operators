@@ -47,8 +47,6 @@ infiniopStatus_t cudaCreateReduceDescriptor(CudaHandle_t handle,
     for (int i = axes_size - 2; i >= 0; i--){
         reduce_axes_stride[i] = reduce_axes_stride[i + 1] * x->shape[axes[i + 1]];
     }
-
-
     memcpy(h_axes, axes, axes_size * sizeof(int64_t));
     memcpy(input_shape, x->shape, x->ndim * sizeof(uint64_t));
     memcpy(output_shape, y->shape, y->ndim * sizeof(uint64_t));

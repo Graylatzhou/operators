@@ -32,9 +32,9 @@ infiniopStatus_t cpuCreateWhereDescriptor(infiniopHandle_t handle,
 
 infiniopStatus_t cpuWhere(WhereCpuDescriptor_t desc,
                                   void *dst, 
-                                  void *src1,
-                                  void *src2,
-                                  void *condition,
+                                  void const *src1,
+                                  void const *src2,
+                                  void const *condition,
                                   void *stream);
 
 infiniopStatus_t cpuDestroyWhereDescriptor(WhereCpuDescriptor_t desc);

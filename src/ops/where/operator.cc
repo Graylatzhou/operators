@@ -34,7 +34,7 @@ __C infiniopStatus_t infiniopCreateWhereDescriptor(
 }
 
 
-__C infiniopStatus_t infiniopWhere(infiniopWhereDescriptor_t desc, void *dst, void *src1, void *src2, void *condition, void *stream) {
+__C infiniopStatus_t infiniopWhere(infiniopWhereDescriptor_t desc, void *dst, void const *src1, void const *src2, void const *condition, void *stream) {
     switch (desc->device) {
 #ifdef ENABLE_CPU
         case DevCpu:

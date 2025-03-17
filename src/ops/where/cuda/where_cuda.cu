@@ -29,10 +29,10 @@ __device__ __forceinline__ uint64_t broadcast_map(
 
 
 
-__global__ void where_f32x4_kernel(float* src1, uint64_t const *src1_shape, 
-                                 float* src2, uint64_t const *src2_shape, 
+__global__ void where_f32x4_kernel(const float* src1, uint64_t const *src1_shape, 
+                                 const float* src2, uint64_t const *src2_shape, 
                                  float* dst, uint64_t const *dst_shape, 
-                                 uint8_t* condition, uint64_t const *condition_shape,
+                                 const uint8_t* condition, uint64_t const *condition_shape,
                                  uint64_t dst_ndim, uint64_t src1_ndim, 
                                  uint64_t src2_ndim, uint64_t condition_ndim,
                                  int64_t const *condition_strides, 
@@ -76,10 +76,10 @@ __global__ void where_f32x4_kernel(float* src1, uint64_t const *src1_shape,
     }
 }
 
-__global__ void where_f16x8_kernel(half* src1, uint64_t const *src1_shape, 
-                                half* src2, uint64_t const *src2_shape, 
+__global__ void where_f16x8_kernel(const half* src1, uint64_t const *src1_shape, 
+                                const half* src2, uint64_t const *src2_shape, 
                                 half* dst, uint64_t const *dst_shape, 
-                                uint8_t* condition, uint64_t const *condition_shape,
+                                const uint8_t* condition, uint64_t const *condition_shape,
                                 uint64_t dst_ndim, uint64_t src1_ndim, 
                                 uint64_t src2_ndim, uint64_t condition_ndim,
                                 int64_t const *condition_strides, 
@@ -129,9 +129,9 @@ template<typename Tdata>
 infiniopStatus_t where_nv_gpu(
     WhereCudaDescriptor_t desc,
     void *dst, 
-    void *src1,
-    void *src2,
-    void *condition,
+    void const *src1,
+    void const *src2,
+    void const *condition,
     int per_thread_element,
     void *stream){
     uint64_t N = desc->element_num;
@@ -139,10 +139,10 @@ infiniopStatus_t where_nv_gpu(
     dim3 grid((N + 256 - 1) / 256);
     if constexpr(std::is_same<Tdata, float>::value){
         where_f32x4_kernel<<<grid, block, 0, (cudaStream_t)stream>>>(
-            reinterpret_cast<float *>(src1), desc->src1_shape, 
-            reinterpret_cast<float *>(src2), desc->src2_shape, 
+            reinterpret_cast<const float *>(src1), desc->src1_shape, 
+            reinterpret_cast<const float *>(src2), desc->src2_shape, 
             reinterpret_cast<float *>(dst), desc->dst_shape, 
-            reinterpret_cast<uint8_t *>(condition), desc->condition_shape,
+            reinterpret_cast<const uint8_t *>(condition), desc->condition_shape,
             desc->dst_ndim, desc->src1_ndim, 
             desc->src2_ndim, desc->condition_ndim,
             desc->condition_strides, 
@@ -152,10 +152,10 @@ infiniopStatus_t where_nv_gpu(
             N);
     } else if constexpr(std::is_same<Tdata, half>::value){
         where_f16x8_kernel<<<grid, block, 0, (cudaStream_t)stream>>>(
-            reinterpret_cast<half *>(src1), desc->src1_shape, 
-            reinterpret_cast<half *>(src2), desc->src2_shape, 
+            reinterpret_cast<const half *>(src1), desc->src1_shape, 
+            reinterpret_cast<const half *>(src2), desc->src2_shape, 
             reinterpret_cast<half *>(dst), desc->dst_shape, 
-            reinterpret_cast<uint8_t *>(condition), desc->condition_shape,
+            reinterpret_cast<const uint8_t *>(condition), desc->condition_shape,
             desc->dst_ndim, desc->src1_ndim, 
             desc->src2_ndim, desc->condition_ndim,
             desc->condition_strides, 
@@ -170,9 +170,9 @@ infiniopStatus_t where_nv_gpu(
 
 infiniopStatus_t cudaWhere(WhereCudaDescriptor_t desc,
     void *dst, 
-    void *src1,
-    void *src2,
-    void *condition,
+    void const *src1,
+    void const *src2,
+    void const *condition,
     void *stream){
     if (desc->dtype == F16){
         return where_nv_gpu<half>(desc, dst, src1, src2, condition, 8, stream);

@@ -17,7 +17,7 @@ __C __export infiniopStatus_t infiniopCreateWhereDescriptor(infiniopHandle_t han
                                                             infiniopTensorDescriptor_t condition
                                                             );
 
-__C __export infiniopStatus_t infiniopWhere(infiniopWhereDescriptor_t desc, void *dst, void *src1, void *src2, void *condition, void *stream);
+__C __export infiniopStatus_t infiniopWhere(infiniopWhereDescriptor_t desc, void *dst, void const *src1, void const *src2, void const *condition, void *stream);
 
 __C __export infiniopStatus_t infiniopDestroyWhereDescriptor(infiniopWhereDescriptor_t desc);
 

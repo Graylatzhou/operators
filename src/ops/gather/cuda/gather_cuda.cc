@@ -20,31 +20,36 @@ infiniopStatus_t cudaCreateGatherDescriptor(CudaHandle_t handle,
     }
     if (axis < 0 || axis >= x->ndim){
         return STATUS_BAD_PARAM;
+    }  
+    int otherDims = 1;
+    for (int i = 0; i < axis; i++){
+        otherDims *= static_cast<int>(x->shape[i]);
     }
-}
-
-infiniopStatus_t gather_nv_gpu(
-    GatherCudaDescriptor_t desc,
-    void *x,
-    void *indices,
-    void *y,
-    void *stream){
+    for (int i = axis + 1; i < x->ndim; i++){
+        otherDims *= static_cast<int>(x->shape[i]);
+    }
+    int stride = 1;
+    for (int i = axis + 1; i < x->ndim; i++){
+        stride *= static_cast<int>(x->shape[i]);
+    }
+    int indices_size = 1;
+    for (int i = 0; i < indices->ndim; i++){
+        indices_size *= static_cast<int>(indices->shape[i]);
+    }
+    int dim_size = static_cast<int>(x->shape[axis]);
+    *desc_ptr = new GatherCudaDescriptor{
+        DevNvGpu,
+        x->dt,
+        indices->dt,
+        axis,
+        otherDims,
+        x->ndim,
+        y->ndim,
+        dim_size,
+        indices_size,
+        stride
+    };
     return STATUS_SUCCESS;
-}
-
-
-infiniopStatus_t cudaGather(GatherCudaDescriptor_t desc,
-                            void *x,
-                            void *indices,
-                            void *y,
-                            void *stream){
-    if (desc->dtype == F16){
-
-    }
-    if (desc->dtype == F32){
-
-    }
-    return STATUS_BAD_DEVICE;
 }
 
 infiniopStatus_t cudaDestroyGatherDescriptor(GatherCudaDescriptor_t desc){

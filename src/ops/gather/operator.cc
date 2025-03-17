@@ -31,7 +31,7 @@ __C infiniopStatus_t infiniopCreateGatherDescriptor(
     }
     return STATUS_BAD_DEVICE;
 }
-__C infiniopStatus_t infiniopGather(infiniopGatherDescriptor_t desc, void *x, void *indices, void *y, void *stream) {
+__C infiniopStatus_t infiniopGather(infiniopGatherDescriptor_t desc, void const *x, void const *indices, void *y, void *stream) {
     switch (desc->device) {
 #ifdef ENABLE_CPU
         case DevCpu:

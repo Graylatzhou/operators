@@ -53,7 +53,7 @@ infiniopStatus_t cudaCreateReduceDescriptor(CudaHandle_t handle,
 
 infiniopStatus_t cudaReduce(ReduceCudaDescriptor_t desc,
     void *y,
-    void *x,
+    void const *x,
     void *stream);
 
 infiniopStatus_t cudaDestroyReduceDescriptor(ReduceCudaDescriptor_t desc);

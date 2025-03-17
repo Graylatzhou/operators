@@ -8,8 +8,15 @@
 typedef struct GatherCudaDescriptor {
     Device device;
     DT dtype;
-    uint64_t ndim;
-    uint64_t element_num;
+    DT indices_dtype;
+    int64_t axis;
+    int otherDims;
+    uint64_t input_ndim;
+    uint64_t output_ndim;
+    int dim_size;
+    int indices_size;
+    int stride;
+
 } GatherCudaDescriptor;
 
 typedef struct GatherCudaDescriptor *GatherCudaDescriptor_t;
@@ -24,8 +31,8 @@ infiniopStatus_t cudaCreateGatherDescriptor(CudaHandle_t handle,
 
 
 infiniopStatus_t cudaGather(GatherCudaDescriptor_t desc,
-                            void *x,
-                            void *indices,
+                            void const *x,
+                            void const *indices,
                             void *y,
                             void *stream);
 

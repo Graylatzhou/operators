@@ -1,1 +1,0 @@
-export INFINI_ROOT=/home/zzw/workspace/operators-dev/build/linux/x86_64/release

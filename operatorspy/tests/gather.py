@@ -30,11 +30,10 @@ class GatherDescriptor(Structure):
 
 infiniopGatherDescriptor_t = POINTER(GatherDescriptor)
 
-def gather(input, indices, axis):
-    np_input = input.numpy()
-    np_indices = indices.numpy()
-    np_output = np.take(np_input, np_indices, axis=axis)
-    return torch.from_numpy(np_output)
+def gather(x, indices, axis = 0):
+    idx = [slice(None)] * x.ndim
+    idx[axis] = indices
+    return x[tuple(idx)]
 
 def tuple_to_void_p(py_tuple: Tuple):
     array = ctypes.c_int64 * len(py_tuple)
@@ -55,16 +54,19 @@ def test(
     tensor_dtype=torch.float16
 ):
     print(
-        f"Testing clip on {torch_device} with x_shape:{x_shape} dtype:{tensor_dtype}"
+        f"Testing gather on {torch_device} with x_shape:{x_shape} dtype:{tensor_dtype}"
     )
     x = torch.randn(x_shape, dtype=tensor_dtype, device=torch_device)
-    if len(x.shape) == 2:
-        indices = torch.tensor(2, dtype=torch.int64, device=torch_device)
-    elif len(x.shape) == 3:
-        indices = torch.tensor([[0, 1], [1, 2]], dtype=torch.int64, device=torch_device)
+    if isinstance(indices_shape, int):
+        indices_shape_tuple = (indices_shape,)
+    else:
+        indices_shape_tuple = tuple(indices_shape)
+    indices = torch.randint(0, x.shape[axis], indices_shape_tuple, 
+                       device=torch_device).type(torch.int64)
     dst = torch.randn(inferShape(x_shape, indices.shape, axis), dtype=tensor_dtype, device=torch_device)
+
     ans = gather(x, indices, axis)
-    axis = axis
+
     x_tensor = to_tensor(x, lib)
     indices_tensor = to_tensor(indices, lib)
     dst_tensor = to_tensor(dst, lib)
@@ -106,25 +108,35 @@ def test(
             )
         elapsed = (time.time() - start_time) / NUM_ITERATIONS
         print(f"lib time: {elapsed :10f}")
-    print(f"pytorch ans: {ans}")
-    print(f"lib ans: {dst}")
+    ans = ans.to(torch_device)
     assert torch.allclose(dst, ans, atol=0, rtol=0)
     check_error(lib.infiniopDestroyGatherDescriptor(descriptor))
 
 def test_cpu(lib, test_cases):
     device = DeviceEnum.DEVICE_CPU
     handle = create_handle(lib, device)
-    for x_shape, indices_shape, axis in test_cases:
-        test(lib, handle, "cpu", x_shape, indices_shape, axis, tensor_dtype=torch.float16)
-        print("\n")
-        #test(lib, handle, "cpu", x_shape, axes, tensor_dtype=torch.float32)
+    for x_shape, indices_shape, axis, tensor_dtype in test_cases:
+        test(lib, handle, "cpu", x_shape, indices_shape, axis, tensor_dtype=tensor_dtype)
+    destroy_handle(lib, handle)
+
+def test_cuda(lib, test_cases):
+    device = DeviceEnum.DEVICE_CUDA
+    handle = create_handle(lib, device)
+    for x_shape, indices_shape, axis, tensor_dtype in test_cases:
+        test(lib, handle, "cuda", x_shape, indices_shape, axis, tensor_dtype=tensor_dtype)
     destroy_handle(lib, handle)
 
 
 if __name__ == "__main__":
     test_cases = [
-        ((3, 4), (2), 0),
-        ((2, 3, 4), (2, 2), 1),
+        ((3, 4), (2), 0, torch.float32),
+        ((64, 64), (64, 64), 0, torch.float32),
+        ((64, 64), (64, 64), 1, torch.float32),
+        ((2, 3, 4), (2, 2), 1, torch.float32),
+        ((64, 64), (64, 64), 0, torch.float16),
+        ((64, 64), (64, 64), 1, torch.float16),
+        ((8, 8, 8, 8, 8), (8, 8), 0, torch.float16),
+        ((8, 8, 8, 8, 8), (8, 8), 2, torch.float16),
     ]
     args = get_args()
     lib = open_lib()
@@ -144,5 +156,8 @@ if __name__ == "__main__":
     ]
     lib.infiniopDestroyGatherDescriptor.restype = c_int32
     lib.infiniopDestroyGatherDescriptor.argtypes = [infiniopGatherDescriptor_t]
-    test_cpu(lib, test_cases)
+    if args.cuda:
+        test_cuda(lib, test_cases)
+    if args.cpu:
+        test_cpu(lib, test_cases)
     print("All tests passed!")

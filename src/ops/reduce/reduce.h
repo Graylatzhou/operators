@@ -3,7 +3,6 @@
 
 #include "export.h"
 #include "operators.h"
-//#include "status.h"
 
 typedef struct ReduceDescriptor {
     Device device;
@@ -20,7 +19,7 @@ __C infiniopStatus_t infiniopCreateReduceDescriptor(infiniopHandle_t handle,
                                                      bool noop_with_empty_axes,
                                                      int reduce_type);
 
-__C infiniopStatus_t infiniopReduce(infiniopReduceDescriptor_t desc, void *y, void *x, void *dynamic_axes, uint64_t dynamic_axes_size, void *stream);
+__C infiniopStatus_t infiniopReduce(infiniopReduceDescriptor_t desc, void *y, const void *x, void *dynamic_axes, uint64_t dynamic_axes_size, void *stream);
 
 __C infiniopStatus_t infiniopDestroyReduceDescriptor(infiniopReduceDescriptor_t desc);
 #endif

@@ -7,13 +7,16 @@
 #define LDST128BITS(value) (reinterpret_cast<float4*>(&(value))[0])
 #define FLOAT4(value) (reinterpret_cast<float4*>(&(value))[0])
 
-__global__ void clip_f32x4_kernel(float *a, float *b, float max_value, float min_value, int N){
+#define LDST128BITS_CONST(value) (reinterpret_cast<float4 const *>(&(value))[0])
+#define FLOAT4_CONST(value) (reinterpret_cast<float4 const *>(&(value))[0])
+
+__global__ void clip_f32x4_kernel(const float *a, float *b, float max_value, float min_value, int N){
     int idx = 4 * (blockDim.x * blockIdx.x + threadIdx.x);
     if (idx < N) {
         int remaining = N - idx;
         float4 reg_a, reg_b;
         if (remaining >= 4) {
-        reg_a = FLOAT4(a[idx]);
+        reg_a = FLOAT4_CONST(a[idx]);
         } else {
             reg_a.x = a[idx];
             reg_a.y = (remaining >= 2) ? a[idx + 1] : 0;
@@ -35,14 +38,14 @@ __global__ void clip_f32x4_kernel(float *a, float *b, float max_value, float min
 }
 
 
-__global__ void clip_f16x8_pack_kernel(half *a, half *b, float max_value, float min_value, int N){
+__global__ void clip_f16x8_pack_kernel(const half *a, half *b, float max_value, float min_value, int N){
     int idx = 8 * (blockDim.x * blockIdx.x + threadIdx.x);
     if (idx >= N) return;
     const half min_half = __float2half(min_value);
     const half max_half = __float2half(max_value);
     half pack_a[8], pack_b[8];
     if (idx + 7 < N) {
-        LDST128BITS(pack_a[0]) = LDST128BITS(a[idx]);
+        LDST128BITS(pack_a[0]) = LDST128BITS_CONST(a[idx]);
     } else {
         for (int i = 0; i < 8 && (idx + i) < N; i++) {
             pack_a[i] = a[idx + i];
@@ -65,7 +68,7 @@ __global__ void clip_f16x8_pack_kernel(half *a, half *b, float max_value, float 
 template<typename Tdata>
 infiniopStatus_t clip_nv_gpu(
     ClipCudaDescriptor_t desc,
-    void *x,
+    void const *x,
     void *y,
     float min_value,
     float max_value,
@@ -75,45 +78,15 @@ infiniopStatus_t clip_nv_gpu(
     dim3 block(256 / per_thread_element);
     dim3 grid((N + 256 - 1) / 256);
     if constexpr(std::is_same<Tdata, float>::value){
-        clip_f32x4_kernel<<<grid, block, 0, (cudaStream_t)stream>>>(reinterpret_cast<float *>(x), reinterpret_cast<float *>(y), max_value, min_value, N);
+        clip_f32x4_kernel<<<grid, block, 0, (cudaStream_t)stream>>>(reinterpret_cast<const float *>(x), reinterpret_cast<float *>(y), max_value, min_value, N);
     }else{
-        clip_f16x8_pack_kernel<<<grid, block, 0, (cudaStream_t)stream>>>(reinterpret_cast<half *>(x), reinterpret_cast<half *>(y), max_value, min_value, N);
+        clip_f16x8_pack_kernel<<<grid, block, 0, (cudaStream_t)stream>>>(reinterpret_cast<const half *>(x), reinterpret_cast<half *>(y), max_value, min_value, N);
     }
-    /*
-    if (desc->ndim != 2){
-        dim3 block(256 / per_thread_element);
-        dim3 grid((N + 256 - 1) / 256);
-        if constexpr(std::is_same<Tdata, float>::value){
-            clip_f32x4_kernel<<<grid, block, 0, (cudaStream_t)stream>>>(reinterpret_cast<float *>(x), reinterpret_cast<float *>(y), max_value, min_value, N);
-        }else{
-            clip_f16x8_pack_kernel<<<grid, block, 0, (cudaStream_t)stream>>>(reinterpret_cast<half *>(x), reinterpret_cast<half *>(y), max_value, min_value, N);
-        }
-    }else{
-        if ((desc->K / per_thread_element) <= 1024){
-            dim3 block(desc->K / (per_thread_element));                                   
-            dim3 grid(desc->S);
-            if constexpr(std::is_same<Tdata, float>::value){
-                clip_f32x4_kernel<<<grid, block, 0, (cudaStream_t)stream>>>(reinterpret_cast<float *>(x), reinterpret_cast<float *>(y), max_value, min_value, N);
-            }else{
-                clip_f16x8_pack_kernel<<<grid, block, 0, (cudaStream_t)stream>>>(reinterpret_cast<half *>(x), reinterpret_cast<half *>(y), max_value, min_value, N);
-            }
-        }
-        else{
-            dim3 block(256 / per_thread_element);
-            dim3 grid((N + 256 - 1) / 256);
-            if constexpr(std::is_same<Tdata, float>::value){
-                clip_f32x4_kernel<<<grid, block, 0, (cudaStream_t)stream>>>(reinterpret_cast<float *>(x), reinterpret_cast<float *>(y), min_value, max_value, N);
-            }else{
-                clip_f16x8_pack_kernel<<<grid, block, 0, (cudaStream_t)stream>>>(reinterpret_cast<half *>(x), reinterpret_cast<half *>(y), min_value, max_value, N);
-            }
-        }
-    }
-        */
     return STATUS_SUCCESS;
 }
 
 infiniopStatus_t cudaClip(ClipCudaDescriptor_t desc,
-    void *x,
+    void const *x,
     void *y,
     float *min,
     float *max,

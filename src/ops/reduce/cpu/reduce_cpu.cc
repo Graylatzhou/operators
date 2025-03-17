@@ -134,7 +134,6 @@ infiniopStatus_t reduce_cpu(ReduceCpuDescriptor_t desc,
     auto y_strides = desc->y_strides;
     int i, j;
     int indices[desc->x_ndim];
-    //#pragma omp parallel for
     std::vector<int> non_reduce_axes;
     for (int j = 0; j < desc->x_ndim; ++j) {
         if (!std::binary_search(axes, axes + num_axes, j)) {
@@ -214,7 +213,7 @@ infiniopStatus_t reduce_cpu(ReduceCpuDescriptor_t desc,
 
 infiniopStatus_t cpuReduce(ReduceCpuDescriptor_t desc,
                             void *y,
-                            void *x,
+                            void const *x,
                             void *dynamic_axes,
                             uint64_t dynamic_axes_size,
                             void *stream){

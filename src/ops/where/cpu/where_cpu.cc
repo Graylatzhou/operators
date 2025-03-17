@@ -111,14 +111,14 @@ inline uint64_t broadcast_map(
 template<typename Tdata>
 infiniopStatus_t where_cpu(WhereCpuDescriptor_t desc,
     void *dst, 
-    void *src1,
-    void *src2,
-    void *condition,
+    void const *src1,
+    void const *src2,
+    void const *condition,
     void *stream){
     auto dst_ = reinterpret_cast<Tdata *>(dst);
-    auto src1_ = reinterpret_cast<Tdata *>(src1);
-    auto src2_ = reinterpret_cast<Tdata *>(src2);
-    auto condition_ = reinterpret_cast<uint8_t *>(condition);
+    auto src1_ = reinterpret_cast<const Tdata *>(src1);
+    auto src2_ = reinterpret_cast<const Tdata *>(src2);
+    auto condition_ = reinterpret_cast<const uint8_t *>(condition);
     #pragma omp parallel for
     for (uint64_t i = 0; i < desc->element_num; i++) {
         uint64_t condition_index = broadcast_map(i, desc->dst_shape, desc->dst_ndim, desc->condition_shape, desc->condition_strides, desc->condition_ndim);
@@ -131,9 +131,9 @@ infiniopStatus_t where_cpu(WhereCpuDescriptor_t desc,
 
 infiniopStatus_t cpuWhere(WhereCpuDescriptor_t desc,
     void *dst, 
-    void *src1,
-    void *src2,
-    void *condition,
+    void const *src1,
+    void const *src2,
+    void const *condition,
     void *stream){
     if (desc->dtype == F16) {
         return where_cpu<uint16_t>(desc, dst, src1, src2, condition, stream);
