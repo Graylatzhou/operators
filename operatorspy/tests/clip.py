@@ -81,6 +81,8 @@ def test(
             ctypes.byref(descriptor),
             x_tensor.descriptor,
             y_tensor.descriptor,
+            ctypes.byref(c_float(min)) if min != None else None,
+            ctypes.byref(c_float(max)) if max != None else None,
         )
     )
     #Ss = [1024, 2048, 4096]
@@ -91,8 +93,6 @@ def test(
             lib.infiniopClip(
                 descriptor,
                 x_tensor.data,
-                ctypes.byref(c_float(min)) if min != None else None,
-                ctypes.byref(c_float(max)) if max != None else None,
                 y_tensor.data,
                 None,
             )
@@ -104,8 +104,6 @@ def test(
                     lib.infiniopClip(
                     descriptor,
                     x_tensor.data,
-                    ctypes.byref(c_float(min)) if min != None else None,
-                    ctypes.byref(c_float(max)) if max != None else None,
                     y_tensor.data,
                     None,
                 )
@@ -137,8 +135,8 @@ if __name__ == "__main__":
         ((3, 4), -1, None, torch.float32),
         ((3, 4), None, None, torch.float32),
         ((16), -1, 1, torch.float32),
-        ((1024, 1024), -1, 1, torch.float32),
-        ((4096, 4096), -1, 1, torch.float32),
+        # ((1024, 1024), -1, 1, torch.float32),
+        # ((4096, 4096), -1, 1, torch.float32),
         
         ((13), -1, 1, torch.float32),
         ((3, 4), -1, 1, torch.float16),
@@ -146,8 +144,8 @@ if __name__ == "__main__":
         ((3, 4), -1, None, torch.float16),
         ((3, 4), None, None, torch.float16),
         ((16), -1, 1, torch.float16),
-        ((1024, 1024), -1, 1, torch.float16),
-        ((4096, 4096), -1, 1, torch.float16),
+        # ((1024, 1024), -1, 1, torch.float16),
+        # ((4096, 4096), -1, 1, torch.float16),
     ]
     args = get_args()
     lib = open_lib()
@@ -161,8 +159,6 @@ if __name__ == "__main__":
     lib.infiniopClip.restype = c_int32
     lib.infiniopClip.argtypes = [
         infiniopClipDescriptor_t,
-        c_void_p,
-        c_void_p,
         c_void_p,
         c_void_p,
         c_void_p

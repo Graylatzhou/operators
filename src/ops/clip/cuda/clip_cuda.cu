@@ -70,17 +70,15 @@ infiniopStatus_t clip_nv_gpu(
     ClipCudaDescriptor_t desc,
     void const *x,
     void *y,
-    float min_value,
-    float max_value,
     int per_thread_element,
     void* stream) {
     uint64_t N = desc->element_num;
     dim3 block(256 / per_thread_element);
     dim3 grid((N + 256 - 1) / 256);
     if constexpr(std::is_same<Tdata, float>::value){
-        clip_f32x4_kernel<<<grid, block, 0, (cudaStream_t)stream>>>(reinterpret_cast<const float *>(x), reinterpret_cast<float *>(y), max_value, min_value, N);
+        clip_f32x4_kernel<<<grid, block, 0, (cudaStream_t)stream>>>(reinterpret_cast<const float *>(x), reinterpret_cast<float *>(y), desc->max, desc->min, N);
     }else{
-        clip_f16x8_pack_kernel<<<grid, block, 0, (cudaStream_t)stream>>>(reinterpret_cast<const half *>(x), reinterpret_cast<half *>(y), max_value, min_value, N);
+        clip_f16x8_pack_kernel<<<grid, block, 0, (cudaStream_t)stream>>>(reinterpret_cast<const half *>(x), reinterpret_cast<half *>(y), desc->max, desc->min, N);
     }
     return STATUS_SUCCESS;
 }
@@ -88,25 +86,12 @@ infiniopStatus_t clip_nv_gpu(
 infiniopStatus_t cudaClip(ClipCudaDescriptor_t desc,
     void const *x,
     void *y,
-    float *min,
-    float *max,
     void *stream){
-    bool has_min = true;
-    bool has_max = true;
-    if (min == nullptr){
-        has_min = false;
-    }
-    if (max == nullptr){
-        has_max = false;
-    }
-    float min_value = has_min ? *min : -std::numeric_limits<float>::infinity();
-    float max_value = has_max ? *max : std::numeric_limits<float>::infinity();
-
     if (desc->dtype == F16) {
-        return clip_nv_gpu<half>(desc, x, y, min_value, max_value, 8, stream);
+        return clip_nv_gpu<half>(desc, x, y, 8, stream);
     }
     if (desc->dtype == F32) {
-        return clip_nv_gpu<float>(desc, x, y, min_value, max_value, 4, stream);
+        return clip_nv_gpu<float>(desc, x, y, 4, stream);
     }
     return STATUS_BAD_TENSOR_DTYPE;
 }

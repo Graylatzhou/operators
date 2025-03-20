@@ -15,16 +15,18 @@ __C infiniopStatus_t infiniopCreateClipDescriptor(
     infiniopHandle_t handle,
     infiniopClipDescriptor_t *desc_ptr,
     infiniopTensorDescriptor_t x,
-    infiniopTensorDescriptor_t y
+    infiniopTensorDescriptor_t y,
+    float* min,
+    float* max
     ) {
     switch (handle->device) {
 #ifdef ENABLE_CPU
         case DevCpu:
-            return cpuCreateClipDescriptor(handle, (ClipCpuDescriptor_t *) desc_ptr, x, y);
+            return cpuCreateClipDescriptor(handle, (ClipCpuDescriptor_t *) desc_ptr, x, y, min, max);
 #endif
 #ifdef ENABLE_NV_GPU
         case DevNvGpu: {
-            return cudaCreateClipDescriptor((CudaHandle_t) handle, (ClipCudaDescriptor_t *) desc_ptr, x, y);
+            return cudaCreateClipDescriptor((CudaHandle_t) handle, (ClipCudaDescriptor_t *) desc_ptr, x, y, min, max);
         }
 #endif
     }
@@ -32,15 +34,15 @@ __C infiniopStatus_t infiniopCreateClipDescriptor(
 }
 
 
-__C infiniopStatus_t infiniopClip(infiniopClipDescriptor_t desc, void const *x, float *min, float *max, void *y, void *stream) {
+__C infiniopStatus_t infiniopClip(infiniopClipDescriptor_t desc, void const *x, void *y, void *stream) {
     switch (desc->device) {
 #ifdef ENABLE_CPU
         case DevCpu:
-            return cpuClip((ClipCpuDescriptor_t) desc, x, min, max, y, stream);
+            return cpuClip((ClipCpuDescriptor_t) desc, x, y, stream);
 #endif
 #ifdef ENABLE_NV_GPU
         case DevNvGpu:
-            return cudaClip((ClipCudaDescriptor_t) desc, x, y, min, max, stream);
+            return cudaClip((ClipCudaDescriptor_t) desc, x, y, stream);
 #endif
     }
     return STATUS_BAD_DEVICE;

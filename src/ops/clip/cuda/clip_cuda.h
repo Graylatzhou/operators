@@ -10,6 +10,10 @@ typedef struct ClipCudaDescriptor {
     DT dtype;
     uint64_t ndim;
     uint64_t element_num;
+    float min;
+    float max;
+    bool has_min;
+    bool hax_max;
 } ClipCudaDescriptor;
 
 typedef struct ClipCudaDescriptor *ClipCudaDescriptor_t;
@@ -17,15 +21,15 @@ typedef struct ClipCudaDescriptor *ClipCudaDescriptor_t;
 infiniopStatus_t cudaCreateClipDescriptor(CudaHandle_t handle,
                                             ClipCudaDescriptor_t *desc_ptr,
                                             infiniopTensorDescriptor_t x,
-                                            infiniopTensorDescriptor_t y
+                                            infiniopTensorDescriptor_t y,
+                                            float* min,
+                                            float* max
                                             );
 
 
 infiniopStatus_t cudaClip(ClipCudaDescriptor_t desc,
                             void const *x,
                             void *y,
-                            float *min,
-                            float *max,
                             void *stream);
 
 infiniopStatus_t cudaDestroyClipDescriptor(ClipCudaDescriptor_t desc);
